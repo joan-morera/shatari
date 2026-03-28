@@ -336,7 +336,6 @@ async function updateDeals(region) {
     let realmIds = Object.keys(realmList).filter(realmId => realmList[realmId] === region).map(id => parseInt(id));
     realmIds.push(CommodityRealm.getRealmForRegion(region));
 
-    let csvPrices = {};       // Prices for items qualifying for the csv output.
     let seenPrices = {};      // Every above-0 price we encounter for 1-stack items.
     let availablePrices = {}; // Every above-0 price we encounter for 1-stack items currently for sale.
 
@@ -366,20 +365,6 @@ async function updateDeals(region) {
             let parsedKey = ItemKeySerialize.parse(itemKey);
             let item = itemList[parsedKey.itemId];
 
-            if (price > 0 &&                                       // Item must have a price on this realm.
-                !parsedKey.itemSuffix &&                           // Item must not have a suffix/breed.
-                item && item.quality > 0 &&                        // Item quality must be better than poor.
-                (item.stack > 1) === isCommodityRealm &&           // Commodity items must come from commodity realms.
-                (parsedKey.itemId === Constants.ITEM_PET_CAGE ||   // Pet cages are allowed. Level is species, there.
-                    (!parsedKey.itemLevel ||                       // Item must not have a level, or if it does,
-                        item.expansion >= currentExpansion         // The item must be from this expansion.
-                    )
-                )
-            ) {
-                csvPrices[itemKey] = csvPrices[itemKey] || [];
-                csvPrices[itemKey].push(price);
-            }
-
             // Only unstackable items are valid for deals, since stackable items are cross-realm anyway.
             if (isCommodityRealm || !item || item.stack > 1) {
                 return;
@@ -397,39 +382,8 @@ async function updateDeals(region) {
         realmState = null;
     }
     logMsg(`${region} deals: data collected for ` +
-        `${Object.keys(csvPrices).length} CSV items, ` +
         `${Object.keys(seenPrices).length} deals items, ` +
         `${Object.keys(availablePrices).length} arbitrage items.`);
-
-    // CSV stuff
-    {
-        aliveness.checkIn();
-        let csvData = ['item', 'level', 'species', 'price'].join(',') + '\n';
-        Object.keys(csvPrices).forEach(itemKey => {
-            csvPrices[itemKey].sort((a, b) => a - b);
-            let median = getMedian(csvPrices[itemKey]);
-            let parsedKey = ItemKeySerialize.parse(itemKey);
-            if (parsedKey.itemId === Constants.ITEM_PET_CAGE) {
-                csvData += [
-                    parsedKey.itemId,
-                    '',                   // level
-                    parsedKey.itemLevel,  // species
-                    median,
-                ].join(',') + '\n';
-            } else {
-                csvData += [
-                    parsedKey.itemId,
-                    parsedKey.itemLevel || '',
-                    '', // species
-                    median,
-                ].join(',') + '\n';
-            }
-        });
-        csvPrices = {};
-        let path = Path.resolve(Constants.DATA_DIR, 'global', `${region}.csv`);
-        await ShatariWriter(path, csvData);
-        logMsg(`${region} deals: CSV region file updated.`);
-    }
 
     aliveness.checkIn();
     let dealState = {
