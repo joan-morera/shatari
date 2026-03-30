@@ -1203,6 +1203,12 @@ do -- ExtraTip "class" definition
 	function class:SetParentClamp(h)
 		local p = self.parent
 		if not p then return end
+		if p.IsAnchoringSecret then -- Cannot match sizes if parent tooltip has secret anchoring
+			if p:IsAnchoringSecret() then
+				return
+			end
+		end
+		if issecretvalue(h) then return end
 		local l,r,t,b = p:GetClampRectInsets()
 		p:SetClampRectInsets(l,r,t,-h)
 	end
