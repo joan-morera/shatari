@@ -87,6 +87,8 @@ if status.filetrackerHandler ~= LOAD_NEW then return end
 status.filetrackerHandler = LOAD_START
 versions.HANDLER = "DataProc"
 
+local issecretvalue = issecretvalue or function() end -- if issecretvalue doesn't exist use the empty function -- ### hybrid support for different WoW clients
+
 --[[
 List of accessors
 {Extracted from Interface\SharedXML\Tooltip\TooltipdataHandler.lua from 10.0.2 47213 Jan 2023}
@@ -777,11 +779,11 @@ local function GenerateTDPHooks()
 		end
 
 		local guid = data.guid
-		if not guid then return end
+		if not guid or issecretvalue(guid) then return end
 		local unit = UnitTokenFromGUID(guid)
-		if not unit then return end
+		if not unit or issecretvalue(unit) then return end
 		local name = UnitName(unit)
-		if not name then return end
+		if not name or issecretvalue(name) then return end
 		-- ### todo: if any of this info is missing, can we extract from gather function instead? would be stored in additional table
 		-- ### Note: the Blizzard code this is derived from does include nils checks, so we shall assume these functions can sometimes fail
 
