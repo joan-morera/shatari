@@ -117,7 +117,7 @@ module.exports = new function () {
      * @param {object} state
      */
     this.put = async function (region, state) {
-        const path = getPath(region);
+        const waitFor = [...putApiData(region, state)];
 
         // Start off with version number in front.
         let bufferSize = 1;
@@ -182,8 +182,9 @@ module.exports = new function () {
         }
 
         const compressed = await gzip(buf);
+        waitFor.push(ShatariWriter(getPath(region), compressed));
 
-        await ShatariWriter(path, compressed);
+        await Promise.all(waitFor);
     }
 
     // ------- //
@@ -198,5 +199,94 @@ module.exports = new function () {
      */
     function getPath(region) {
         return Path.resolve(DATA_DIR, 'global', 'region-' + region + '.bin');
+    }
+
+    /**
+     * Writes the JSON API files for the region data.
+     *
+     * @param {string} region
+     * @param {object} state
+     * @return {Promise[]}
+     */
+    function putApiData(region, state) {
+        const API_DIR = Constants.API_DIR;
+
+        const waitFor = [];
+
+        const data = {
+            item: {},
+            pet: {},
+        };
+
+        Object.keys(state.items || {}).forEach(itemKeyString => {
+            let itemKey = ItemKeySerialize.parse(itemKeyString);
+
+            const itemData = {
+                median: state.items[itemKeyString],
+            };
+            const arbitrage = state.arbitrage?.[itemKeyString];
+            if (arbitrage?.realms) {
+                itemData.min = arbitrage.min;
+                itemData.realms = arbitrage.realms;
+            }
+
+            let target;
+            if (itemKey.itemId === Constants.ITEM_PET_CAGE) {
+                const species = itemKey.itemLevel;
+                const breed = itemKey.itemSuffix;
+                target = data.pet[species] ??= {
+                    species,
+                    ...itemData,
+                };
+
+                if (breed) {
+                    target.breed ??= {};
+                    target = target.breed[breed] ??= {
+                        breed,
+                        ...itemData,
+                    };
+                }
+            } else {
+                target = data.item[itemKey.itemId] ??= {
+                    item: itemKey.itemId,
+                    ...itemData,
+                };
+                if (itemKey.itemLevel) {
+                    target.level ??= {};
+                    target = target.level[itemKey.itemLevel] ??= {
+                        level: itemKey.level,
+                        ...itemData,
+                    };
+                }
+                if (itemKey.itemSuffix) {
+                    target.suffix ??= {};
+                    target = target.suffix[itemKey.itemSuffix] ??= {
+                        suffix: itemKey.suffix,
+                        ...itemData,
+                    };
+                }
+            }
+            Object.assign(target, itemData);
+        });
+
+        const save = (itemType, size, data) => {
+            const filePath = Path.resolve(API_DIR, 'region', itemType, size, `${region}.json`);
+            const json = JSON.stringify(data);
+            waitFor.push(ShatariWriter(filePath, json));
+            waitFor.push((async () => {
+                await ShatariWriter(`${filePath}.gz`, await gzip(json));
+            })());
+        };
+
+        save('items', 'full', data.item);
+        save('pets', 'full', data.pet);
+
+        Object.values(data.item).forEach(entry => {delete entry.level});
+        Object.values(data.pet).forEach(entry => {delete entry.breed});
+
+        save('items', 'base', data.item);
+        save('pets', 'base', data.pet);
+
+        return waitFor;
     }
 };

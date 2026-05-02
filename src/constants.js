@@ -9,6 +9,7 @@ module.exports = new function () {
     this.MAX_HISTORY = 14 * this.MS_DAY;
 
     this.DATA_DIR = Path.resolve(__dirname, '..', 'data');
+    this.API_DIR = Path.resolve(__dirname, '..', 'api');
 
     this.CLASS_WEAPON = 2;
     this.CLASS_ARMOR = 4;
