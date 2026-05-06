@@ -7,6 +7,7 @@ const ItemKeySerialize = require('./itemKeySerialize');
 const ShatariWriter = require('./shatariWriter');
 const {getRegionForRealm} = require("./commodityRealm");
 const ItemList = require("./api/ItemList");
+const RealmListReader = require("./api/realmListReader");
 
 const DATA_DIR = Constants.DATA_DIR;
 
@@ -268,7 +269,7 @@ module.exports = new function () {
         const waitFor = [];
 
         {
-            const list = new ItemList();
+            const list = new ItemList(state.snapshot);
 
             Object.entries(state.summary || {}).forEach(([itemKeyString, record]) => {
                 const itemData = {
@@ -315,7 +316,18 @@ module.exports = new function () {
             });
 
             const filePath = Path.resolve(Constants.API_DIR, 'realm', 'stats', `${connectedRealmId}.json`);
-            const json = JSON.stringify(data);
+            const json = JSON.stringify({
+                request: {
+                    region: RealmListReader.getRegionByConnectedId(connectedRealmId),
+                    realms: RealmListReader.getRealmSlugsByConnectedId(connectedRealmId),
+                    list: 'stats',
+                },
+                result: {
+                    lastUpdated: new Date(),
+                    snapshot: new Date(state.snapshot),
+                    stats: data,
+                },
+            });
             waitFor.push(ShatariWriter(filePath, json));
             waitFor.push((async () => {
                 await ShatariWriter(`${filePath}.gz`, await gzip(json));

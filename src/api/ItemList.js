@@ -3,10 +3,16 @@ const ItemKeySerialize = require("../itemKeySerialize");
 const Constants = require("../constants");
 const ShatariWriter = require("../shatariWriter");
 const {gzip} = require("node-gzip");
+const RealmListReader = require("./realmListReader");
 
 module.exports = class ItemList {
     #items = {};
     #pets = {};
+    #snapshot = undefined;
+
+    constructor(snapshot) {
+        this.#snapshot = snapshot;
+    }
 
     add(itemKeyString, itemData) {
         const itemKey = ItemKeySerialize.parse(itemKeyString);
@@ -53,9 +59,33 @@ module.exports = class ItemList {
     save(stateType, fileName, isCommodities) {
         const waitFor = [];
 
+        let region;
+        let realms;
+        if (stateType === 'region') {
+            region = fileName;
+        } else if (stateType === 'realm') {
+            region = RealmListReader.getRegionByConnectedId(fileName);
+            realms = RealmListReader.getRealmSlugsByConnectedId(fileName);
+        }
+
         const saveOne = (itemType, size, data) => {
             const filePath = Path.resolve(Constants.API_DIR, stateType, itemType, size, `${fileName}.json`);
-            const json = JSON.stringify(data);
+
+            const request = {};
+            if (region) request.region = region;
+            if (realms) request.realms = realms;
+            request.list = itemType;
+            request.detail = size;
+
+            const result = {
+                lastUpdated: new Date(),
+            };
+            if (this.#snapshot) {
+                result.snapshot = new Date(this.#snapshot);
+            }
+            result[itemType] = data;
+
+            const json = JSON.stringify({request, result});
             waitFor.push(ShatariWriter(filePath, json));
             waitFor.push((async () => {
                 await ShatariWriter(`${filePath}.gz`, await gzip(json));
