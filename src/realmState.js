@@ -280,7 +280,7 @@ module.exports = new function () {
                     if (itemData.price === 0) {
                         return;
                     }
-                    itemData.seen = new Date(record[0]).toJSON();
+                    itemData.seen = new Date(record[0]);
                 }
 
                 list.add(itemKeyString, itemData);

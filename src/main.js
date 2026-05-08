@@ -19,6 +19,11 @@ const Constants = require('./constants');
 const CommodityRealm = require('./commodityRealm');
 const ShatariWriter = require('./shatariWriter');
 
+// Strip milliseconds from JSON representations of dates, since we always deal in whole seconds.
+Date.prototype.toJSON = function () {
+    return this.toISOString().substring(0, 19) + 'Z';
+};
+
 const api = new BNet();
 const regions = [api.REGION_US, api.REGION_EU, api.REGION_TW, api.REGION_KR];
 
