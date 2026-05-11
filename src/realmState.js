@@ -228,13 +228,7 @@ module.exports = new function () {
             ShatariWriter(getPath(connectedRealmId), comp),
             ShatariWriter(getPath(connectedRealmId, true), freeComp),
         );
-
-        {
-            const startTime = Date.now();
-            await Promise.all(waitFor);
-            const endTime = Date.now();
-            console.log('                    RealmState Writer took ' + (endTime - startTime).toLocaleString() + `ms to finish realm ${connectedRealmId}`);
-        }
+        await Promise.all(waitFor);
     }
 
     // ------- //
