@@ -34,7 +34,7 @@ const BOUND_ITEMS_INTERVAL = 2 * Constants.MS_HOUR;
 const MAX_ALIVENESS_DELAY = 10 * Constants.MS_MINUTE;
 const MAX_RUN_TIME = 6 * Constants.MS_HOUR;
 const MAX_SNAPSHOT_INTERVAL = 2 * Constants.MS_HOUR;
-const SNAPSHOTS_FOR_INTERVAL = 20;
+const SNAPSHOTS_FOR_INTERVAL = 36;
 const TOKEN_INTERVAL = 20 * Constants.MS_MINUTE + 10 * Constants.MS_SEC;
 
 let aliveness;
@@ -507,11 +507,9 @@ function logQueueStatus() {
  * @return {number}
  */
 function nextCheckTimestamp(realmState) {
-    const now = Date.now();
-
     if (!realmState.lastCheck) {
         // We never checked this realm before.
-        return now;
+        return 0;
     }
 
     const snapshots = realmState.snapshots || [];
@@ -519,24 +517,38 @@ function nextCheckTimestamp(realmState) {
     for (let x = Math.max(1, snapshots.length - SNAPSHOTS_FOR_INTERVAL); x < snapshots.length; x++) {
         minInterval = Math.min(minInterval, snapshots[x] - snapshots[x - 1]);
     }
-    const nextSnapshot = (realmState.snapshot || realmState.lastCheck) + minInterval;
 
-    // Don't let us check more frequently than every 5 minutes.
-    const fallback = realmState.lastCheck + 5 * Constants.MS_MINUTE;
+    // When we expect the next update to land.
+    const expectedUpdate = (realmState.snapshot || realmState.lastCheck) + minInterval;
 
-    if (nextSnapshot < now) {
-        // We're overdue.
-        return Math.max(fallback, now);
+    // How long past the expected update time we are.
+    const overdue = realmState.lastCheck - expectedUpdate;
+
+    if (overdue < 0) {
+        // We're on time, update is still in the future.
+        return Math.max(
+            expectedUpdate - 45 * Constants.MS_SEC, // Check a little early.
+            realmState.lastCheck + Constants.MS_MINUTE, // Fail-safe: check no sooner than every minute.
+        );
     }
 
-    const early = nextSnapshot - 2 * Constants.MS_MINUTE;
-    if (early > now) {
-        // It's far in the future. Guess 2 minutes early, to look for a smaller interval.
-        return Math.max(fallback, early);
+    if (overdue < 5 * Constants.MS_MINUTE) {
+        // Update was expected 0-5 minutes ago.
+        return realmState.lastCheck + Constants.MS_MINUTE;
     }
 
-    // It's soon.
-    return nextSnapshot + 10 * Constants.MS_SEC;
+    if (overdue < 30 * Constants.MS_MINUTE) {
+        // Update was expected 5-30 minutes ago.
+        return realmState.lastCheck + 5 * Constants.MS_MINUTE;
+    }
+
+    if (overdue < 120 * Constants.MS_MINUTE) {
+        // Update was expected 30-120 minutes ago.
+        return realmState.lastCheck + 15 * Constants.MS_MINUTE;
+    }
+
+    // Update was expected over 2 hours ago.
+    return realmState.lastCheck + 30 * Constants.MS_MINUTE;
 }
 
 /**
