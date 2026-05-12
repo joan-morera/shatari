@@ -241,7 +241,7 @@ module.exports = new function () {
      * Loads the main state object from disk, updates the last check time in it, and saves it.
      *
      * @param {number} connectedRealmId
-     * @param {object} lastCheck
+     * @param {number} lastCheck
      */
     this.updateLastCheck = async function (connectedRealmId, lastCheck) {
         const path = getPath(connectedRealmId);

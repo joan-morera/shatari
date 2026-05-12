@@ -212,6 +212,7 @@ const realmProcess = new function () {
     }
 
     /**
+     * Updates the realm state files with the given timestamps and summary info.
      *
      * @param {number} connectedRealmId
      * @param {number} checkStart
